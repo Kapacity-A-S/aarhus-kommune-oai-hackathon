@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "openai_hack"
+version = "0.1.0"
+description = "twoday kapacity llm best practice framework"
+authors = ["Jonathan Hvithamar Rystrøm <johr@kapacity.dk>"]
+readme = "README.md"
+packages = [{include = "llm_extract", from="src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+openai = "^1.2.4"
+python-dotenv = "^1.0.0"
+tiktoken = "^0.5.1"
+requests = "^2.31.0"
+spacy = "^3.7.2"
+pydantic = "<3.0.0"
+loguru = "^0.7.2"
+pypdf = "^3.17.4"
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.27.1"
+pre-commit = "^3.6.0"
+poetry = "^1.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
