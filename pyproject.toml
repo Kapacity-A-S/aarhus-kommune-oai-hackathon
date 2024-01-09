@@ -16,6 +16,7 @@ spacy = "^3.7.2"
 pydantic = "<3.0.0"
 loguru = "^0.7.2"
 pypdf = "^3.17.4"
+gradio = "^4.13.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.27.1"
