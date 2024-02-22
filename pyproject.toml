@@ -17,11 +17,11 @@ pydantic = "<3.0.0"
 loguru = "^0.7.2"
 pypdf = "^3.17.4"
 gradio = "^4.13.0"
+instructor = "^0.6.1"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.27.1"
 pre-commit = "^3.6.0"
-poetry = "^1.7.1"
 
 [build-system]
 requires = ["poetry-core"]
