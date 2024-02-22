@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
-from pprint import pprint
 from typing import Any, Literal
 
 import instructor
 from pydantic import BaseModel, Field
+from tqdm import tqdm
 
 import src.llm_extract.azure_client as azure_client
 
@@ -35,15 +35,30 @@ event_types = Literal[
 class extract_case_information(BaseModel):
     """Extracts and summarises all relevant information from a case file. Be as thorough as possible. The more information the better."""
 
-    name: str = Field(..., title="Barnets navn")
-    opvaekst: str = Field(..., title="Beskrivelse af barnets opvækst")
-    familieforhold: str = Field(..., title="Beskrivelse af barnets familieforhold")
-    hjemmets_ressourcer: str = Field(..., title="Beskrivelse af hjemmets ressourcer")
-    dagligdag_i_hjemmet: str = Field(
-        ...,
+    name: str | None = Field(None, title="Barnets navn")
+    diagnoser: list[Diagnosis] | None = Field(None, title="Barnets diagnoser")
+    opvaekst: str | None = Field(None, title="Beskrivelse af barnets opvækst")
+    familieforhold: str | None = Field(
+        None,
+        title="Beskrivelse af barnets familieforhold",
+    )
+    hjemmets_ressourcer: str | None = Field(
+        None,
+        title="Beskrivelse af hjemmets ressourcer",
+    )
+    dagligdag_i_hjemmet: str | None = Field(
+        None,
         title="Beskrivelse af barnets dagligdag i hjemmet",
     )
-    underretninger: list[str] = Field(..., title="Underretninger om barnet")
+
+
+class DocumentInfo(BaseModel):
+    document_name: str
+    start_page: int
+
+
+class extract_docs(BaseModel):
+    documents: list[DocumentInfo]
 
 
 client = instructor.patch(azure_client.initialize_client())
@@ -61,28 +76,60 @@ def extract_content(result: dict, page_number: int = 4) -> str:
     return content
 
 
-len(result["pages"])
+first_page = extract_content(result, 0)
 
-bfu_range = range(7, 24)
-bfu_content = "\n".join(
-    extract_content(result, page_number) for page_number in bfu_range
+doc_info = client.chat.completions.create(
+    messages=[
+        {"role": "system", "content": "Please extract the document information."},
+        {"role": "user", "content": first_page},
+    ],
+    model="gpt-35-turbo",
+    temperature=0.0,
+    response_model=extract_docs,
 )
 
-content = extract_content(result)
+
+doc_start_pages = [
+    doc.start_page for doc in doc_info.documents if doc.start_page > 0
+] + [len(result["pages"]) + 1]
+
+doc_ranges = [
+    list(range(start - 1, end - 1))
+    for start, end in zip(doc_start_pages, doc_start_pages[1:])
+]
+
+
+contents = [
+    "\n".join(extract_content(result, page_number) for page_number in doc_range)
+    for doc_range in doc_ranges
+]
+
+
+all_content = "\n".join(
+    extract_content(result, page_number) for page_number in range(len(result["pages"]))
+)
+
 
 SYSTEM_MESSAGE = {
     "role": "system",
-    "content": "You are a world class information extraction algorithm. Your accuracy, precision and recall are all 100%. You only extract information from the given text, never add any of your own.",
+    "content": "You are a world class information extraction algorithm. You extract all relevant information from a case file and present it clearly and concisely.",
 }
 
-extracted = client.chat.completions.create(
-    messages=[
-        SYSTEM_MESSAGE,
-        {"role": "user", "content": bfu_content},
-    ],
-    model="gpt-35-turbo",
-    response_model=extract_case_information,
-)
+
+def extract_info_from_doc(all_content: str) -> extract_case_information:
+    extracted = client.chat.completions.create(
+        messages=[
+            SYSTEM_MESSAGE,
+            {"role": "user", "content": all_content},
+        ],
+        model="gpt4-turbo",
+        temperature=0.0,
+        max_retries=2,
+        response_model=extract_case_information,
+    )
+    return extracted
 
 
-pprint(extracted.model_dump())
+extractions = [extract_info_from_doc(content) for content in tqdm(contents[1:])]
+
+full_extraction = extract_info_from_doc(all_content)
